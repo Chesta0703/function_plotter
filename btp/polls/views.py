@@ -1,6 +1,4 @@
 from django.shortcuts import render
-
-# Create your views here.
 from django.http import HttpResponse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,13 +6,11 @@ import numpy as np
 def index(request):
     return HttpResponse("Hello, world. You're at the polls index.")
 
-
-
 def save_plot_power_function(p, image_path):
     x = np.linspace(0, 10, 400)
     y = x ** p
 
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(8, 6))
     plt.plot(x, y, label=f'y = x^{p}')
     plt.xlabel('x')
     plt.ylabel('y')
@@ -24,7 +20,6 @@ def save_plot_power_function(p, image_path):
     plt.savefig(image_path)
     plt.close()
 
-
 def plot_view(request):
     image_path = None
 
@@ -32,11 +27,11 @@ def plot_view(request):
         p = request.POST.get('p')
         if p:
             try:
-                p = int(p)
+                p = float(p)  # Convert p to a floating-point number
                 image_path = 'polls/static/plot.png'
                 save_plot_power_function(p, image_path)
             except ValueError:
-                # Handle the error if p is not an integer
+                # Handle the error if p is not a valid floating-point number
                 pass
 
     return render(request, 'polls/plot.html', {'image_path': image_path})
