@@ -5,6 +5,7 @@
 <html>
 <head>
     <title>Networked Epidemiology Model</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <!-- Include your styles and scripts here -->
     <style>
         body {
@@ -60,6 +61,7 @@
 </head>
 <body>
     <form id="epiForm" method="post">
+        {% csrf_token %}
         <label for="n">Number of Nodes:</label>
         <input type="number" id="n" name="n" required><br>
 
@@ -102,7 +104,7 @@
     e.preventDefault();
     var formData = new FormData(this);
     
-    fetch('/path_to_your_networked_epi_view', {
+    fetch('', {
         method: 'POST',
         body: formData
     })
@@ -116,6 +118,9 @@
             epiPlots.appendChild(img);
         });
     });
+
+    
+
 });
 
     </script>
