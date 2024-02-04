@@ -49,3 +49,25 @@ def networked_epi_view(request):
         return JsonResponse({'plots': plots, 'graph': {'nodes': nodes, 'links': links}})
 
     return render(request, 'polls/networked_epi.html', {})
+
+
+from django.http import HttpResponseNotFound
+
+def get_sir_plot(request, node_id):
+    try:
+        node_id = int(node_id)  # Convert the node_id to an integer
+        # Assuming you have a way to generate or retrieve an SIR plot for the given node_id
+        plt.figure(figsize=(5, 4))
+        # Example plotting code; you'll replace this with your actual plotting logic
+        plt.plot([1, 2, 3], [1, 4, 9], label='Example Plot')
+        plt.legend()
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png')
+        plt.close()
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+        encoded = base64.b64encode(image_png).decode('utf-8')
+        return JsonResponse({'plot': encoded})
+    except ValueError:
+        return HttpResponseNotFound('Node not found')
