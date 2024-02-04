@@ -1,16 +1,12 @@
-# In your views.py
-
-from django.shortcuts import render
 from django.http import JsonResponse
 import numpy as np
+import matplotlib
+from django.shortcuts import render
+matplotlib.use('Agg')  # Ensure using non-GUI backend for matplotlib
 import matplotlib.pyplot as plt
 import io
 import base64
-from .models import NetworkedEpi  # Import the NetworkedEpi class
-
-def index(request):
-    # Your existing index view
-    return HttpResponse("Hello, world. You're at the polls index.")
+from .models import NetworkedEpi  # Assuming your model is correctly set up
 
 def networked_epi_view(request):
     if request.method == 'POST':
@@ -42,6 +38,14 @@ def networked_epi_view(request):
             plt.close()
             plots.append(encoded)
 
-        return JsonResponse({'plots': plots})
+        # Construct the nodes and links for the network graph
+        nodes = [{'id': i, 'label': f'Node {i}'} for i in range(n)]
+        links = []
+        for i in range(n):
+            for j in range(n):
+                if beta[i][j] > 0:  # Assuming a link exists if beta[i][j] is non-zero
+                    links.append({'source': i, 'target': j, 'weight': beta[i][j]})
+
+        return JsonResponse({'plots': plots, 'graph': {'nodes': nodes, 'links': links}})
 
     return render(request, 'polls/networked_epi.html', {})

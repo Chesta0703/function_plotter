@@ -6,6 +6,8 @@
 <head>
     <title>Networked Epidemiology Model</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+
     <!-- Include your styles and scripts here -->
     <style>
         body {
@@ -74,7 +76,9 @@
         <input type="submit" value="Generate">
     </form>
 
-    <div id="epiPlots"></div>
+    <div id="networkGraph" style="width: 960px; height: 600px;"></div> <!-- Container for the network graph -->
+    <div id="epiPlots"></div> <!-- Container for the SIR plots -->
+
 
     <script>
         // Inside your <script> tag in networked_epi.html
@@ -100,28 +104,157 @@
     }
 });
 
-    document.getElementById('epiForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var formData = new FormData(this);
-    
-    fetch('', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        var epiPlots = document.getElementById('epiPlots');
-        epiPlots.innerHTML = '';
-        data.plots.forEach(function(plot) {
-            var img = new Image();
-            img.src = 'data:image/png;base64,' + plot;
-            epiPlots.appendChild(img);
+
+
+        document.getElementById('epiForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+
+            // Assuming the server response includes both the plots data and the nodes/links data for the network graph
+            fetch('', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Assuming 'data' includes 'plots' for the SIR plots and 'graph' for the network graph data
+                displaySIRPlots(data.plots);
+                createNetworkGraph(data.graph);
+            });
         });
+
+        function displaySIRPlots(plots) {
+            var epiPlots = document.getElementById('epiPlots');
+            epiPlots.innerHTML = '';
+            plots.forEach(function(plot) {
+                var img = new Image();
+                img.src = 'data:image/png;base64,' + plot;
+                epiPlots.appendChild(img);
+            });
+        }
+
+       
+   
+
+
+        function createNetworkGraph(data) {
+    var svg = d3.select('#networkGraph').append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', [0, 0, 960, 600]);
+
+    var simulation = d3.forceSimulation(data.nodes)
+        .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody())
+        .force('center', d3.forceCenter(960 / 2, 600 / 2));
+
+    var link = svg.append('g')
+        .selectAll('line')
+        .data(data.links)
+        .join('line')
+        .attr('stroke-width', d => Math.sqrt(d.weight))
+        .attr('stroke', '#999')
+        .attr('stroke-opacity', 0.6);
+
+    var node = svg.append('g')
+        .selectAll('circle')
+        .data(data.nodes)
+        .join('circle')
+        .attr('r', 5)
+        .attr('fill', 'blue')
+        .call(d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended))
+        .on('click', displaySIRPlot);
+
+    var labels = svg.append('g')
+        .selectAll('text')
+        .data(data.nodes)
+        .join('text')
+        .text(d => d.label)
+        .attr('x', 8)
+        .attr('y', '0.31em')
+        .attr('font-family', 'sans-serif')
+        .attr('font-size', 'small')
+        .style('pointer-events', 'none')
+        .style('fill', '#333');
+
+    simulation.on('tick', () => {
+        link.attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node.attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+
+        labels.attr('transform', d => `translate(${d.x},${d.y})`);
     });
 
-    
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
 
-});
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+
+
+    function displaySIRPlot(d) {
+    // Make an HTTP request to your server to fetch the SIR plot for the selected node
+    fetch(`/get_sir_plot/${d.id}`)
+        .then(response => response.json())
+        .then(data => {
+            // Assuming the server returns a JSON object with a 'plot' field containing the base64-encoded image data
+            var plotData = data.plot;
+            
+            // Check if the SIR plot container exists; if not, create it
+            var plotContainer = document.getElementById('sirPlotContainer');
+            if (!plotContainer) {
+                plotContainer = document.createElement('div');
+                plotContainer.id = 'sirPlotContainer';
+                document.body.appendChild(plotContainer);
+            }
+
+            // Create or update the image element to display the SIR plot
+            var img = document.getElementById('sirPlotImage');
+            if (!img) {
+                img = new Image();
+                img.id = 'sirPlotImage';
+                plotContainer.appendChild(img);
+            }
+
+            // Update the image source with the fetched plot data
+            img.src = 'data:image/png;base64,' + plotData;
+
+            // Optionally, add a caption or additional info about the selected node
+            var caption = document.getElementById('sirPlotCaption');
+            if (!caption) {
+                caption = document.createElement('p');
+                caption.id = 'sirPlotCaption';
+                plotContainer.appendChild(caption);
+            }
+            caption.textContent = `SIR Plot for Node ${d.id}`;
+        })
+        .catch(error => {
+            console.error('Error fetching SIR plot:', error);
+            // Handle errors, such as by displaying an error message to the user
+        });
+}
+
+}
+
 
     </script>
 </body>
