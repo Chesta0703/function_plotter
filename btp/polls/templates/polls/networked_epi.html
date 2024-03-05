@@ -102,7 +102,9 @@
 
     <div id="graphContainer">
         <div id="networkGraph"></div> <!-- Container for the network graph -->
-        <div id="epiPlots"></div> <!-- Container for the SIR plots -->
+        <div id="epiPlotContainer"></div>
+
+        <!-- <div id="epiPlots"></div> Container for the SIR plots -->
     </div>
 
     
@@ -134,88 +136,39 @@
 
 
    document.getElementById('epiForm').addEventListener('submit', function(e) {
-       e.preventDefault();
-       var formData = new FormData(this);
+    e.preventDefault();
+    var formData = new FormData(this);
 
-       // Assuming the server response includes both the plots data and the nodes/links data for the network graph
-       fetch('', {
-               method: 'POST',
-               body: formData
-           })
-           .then(response => response.json())
-           .then(data => {
-               // Assuming 'data' includes 'plots' for the SIR plots and 'graph' for the network graph data
-               displaySIRPlots(data.plots);
-               createNetworkGraph(data.graph);
-           });
-   });
+    fetch('', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        createNetworkGraph(data.graph); // Assuming 'data.graph' contains nodes and links for the network
+    });
+});
 
-   function displaySIRPlots(plots) {
-       var epiPlots = document.getElementById('epiPlots');
-       epiPlots.innerHTML = '';
-       plots.forEach(function(plot) {
-           var img = new Image();
-           img.src = 'data:image/png;base64,' + plot;
-           epiPlots.appendChild(img);
-       });
-   }
-
-
-
-
-   function createNetworkGraph(data) {
+function createNetworkGraph(data) {
     var svg = d3.select('#networkGraph').append('svg')
         .attr('width', '100%')
         .attr('height', '100%')
         .attr('viewBox', [0, 0, 960, 600]);
-
-    var tooltip = d3.select("body").append("div")
-        .attr("class", "tooltip")
-        .style("opacity", 0);
 
     var simulation = d3.forceSimulation(data.nodes)
         .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
         .force('charge', d3.forceManyBody())
         .force('center', d3.forceCenter(960 / 2, 600 / 2));
 
-        var links = [];
-        for (var i = 0; i < n; i++) {
-            for (var j = 0; j < n; j++) {
-                if (beta[i][j] > 0) {
-                    links.push({
-                        'source': nodes[i].id,
-                        'target': nodes[j].id,
-                        'weight': beta[i][j]
-                    });
-                }
-            }
-        }
-
     var link = svg.append('g')
-        .attr('class', 'links')
         .selectAll('line')
         .data(data.links)
         .enter().append('line')
         .attr('stroke-width', d => Math.sqrt(d.weight))
         .attr('stroke', '#999')
-        .attr('stroke-opacity', 0.6)
-        .on('mouseover', function(event, d) {
-            tooltip.transition()
-                .duration(200)
-                .style("opacity", .9);
-            tooltip.html(`β<sub>${d.source.id},${d.target.id}</sub> = ${d.weight}`)
-                .style("left", (event.pageX) + "px")
-                .style("top", (event.pageY - 28) + "px");
-        })
-        .on('mouseout', function() {
-            tooltip.transition()
-                .duration(500)
-                .style("opacity", 0);
-        });
+        .attr('stroke-opacity', 0.6);
 
-
-    var node = svg.append('g')    
-        .attr('class', 'nodes')
+    var node = svg.append('g')
         .selectAll('circle')
         .data(data.nodes)
         .enter().append('circle')
@@ -225,76 +178,55 @@
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended))
-        .on('click', displaySIRPlot);    
+        .on('click', displaySIRPlot);
 
- 
+    var labels = svg.append('g')
+        .selectAll('text')
+        .data(data.nodes)
+        .join('text')
+        .text(d => d.label)
+        .attr('x', 8)
+        .attr('y', '0.31em')
+        .attr('font-family', 'sans-serif')
+        .attr('font-size', 'small')
+        .style('pointer-events', 'none')
+        .style('fill', '#333');
 
-       var labels = svg.append('g')
-           .selectAll('text')
-           .data(data.nodes)
-           .join('text')
-           .text(d => d.label)
-           .attr('x', 8)
-           .attr('y', '0.31em')
-           .attr('font-family', 'sans-serif')
-           .attr('font-size', 'small')
-           .style('pointer-events', 'none')
-           .style('fill', '#333');
+    simulation.on('tick', () => {
+        link.attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
 
-       simulation.on('tick', () => {
-           link.attr('x1', d => d.source.x)
-               .attr('y1', d => d.source.y)
-               .attr('x2', d => d.target.x)
-               .attr('y2', d => d.target.y);
+        node.attr('cx', d => d.x)
+            .attr('cy', d => d.y);
 
-           node.attr('cx', d => d.x)
-               .attr('cy', d => d.y);
+        labels.attr('transform', d => `translate(${d.x},${d.y})`);
+    });
 
-           labels.attr('transform', d => `translate(${d.x},${d.y})`);
-       });
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
 
-       function dragstarted(event, d) {
-           if (!event.active) simulation.alphaTarget(0.3).restart();
-           d.fx = d.x;
-           d.fy = d.y;
-       }
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
 
-       function dragged(event, d) {
-           d.fx = event.x;
-           d.fy = event.y;
-       }
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+}
 
-       function dragended(event, d) {
-           if (!event.active) simulation.alphaTarget(0);
-           d.fx = null;
-           d.fy = null;
-       }
+function displaySIRPlot(d) {
+    // Construct the URL to fetch the plot for the clicked node
+    var url = `/polls/get_sir_plot/${d.id}`;  // Adjust the path as needed
 
-       var link = svg.append('g')
-           .selectAll('line')
-           .data(data.links)
-           .join('line')
-           .attr('stroke-width', d => Math.sqrt(d.weight))
-           .attr('stroke', '#999')
-           .attr('stroke-opacity', 0.6)
-           .on('mouseover', function(event, d) {
-               tooltip.transition()
-                   .duration(200)
-                   .style("opacity", .9);
-               tooltip.html(`β<sub>${d.source.id},${d.target.id}</sub> = ${d.weight}`)
-                   .style("left", (event.pageX) + "px")
-                   .style("top", (event.pageY - 28) + "px");
-           })
-           .on('mouseout', function(d) {
-               tooltip.transition()
-                   .duration(500)
-                   .style("opacity", 0);
-           });
-
-
-           function displaySIRPlot(d) {
-    // Correct the URL to match your Django URL pattern for fetching an SIR plot
-    fetch(`/get_sir_plot/${d.id}`)
+    fetch(url)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -302,38 +234,22 @@
             return response.json();
         })
         .then(data => {
+            // Assuming 'data' contains the 'plot' key with the base64-encoded image
             var plotData = data.plot;
-            var plotContainer = document.getElementById('sirPlotContainer');
-            if (!plotContainer) {
-                plotContainer = document.createElement('div');
-                plotContainer.id = 'sirPlotContainer';
-                document.body.appendChild(plotContainer);
-            }
-            var img = document.getElementById('sirPlotImage');
-            if (!img) {
-                img = new Image();
-                img.id = 'sirPlotImage';
-                plotContainer.appendChild(img);
-            }
-            img.src = 'data:image/png;base64,' + plotData;
-            var caption = document.getElementById('sirPlotCaption');
-            if (!caption) {
-                caption = document.createElement('p');
-                caption.id = 'sirPlotCaption';
-                plotContainer.appendChild(caption);
-            }
-            caption.textContent = `SIR Plot for Node ${d.id}`;
+
+            var epiPlotContainer = document.getElementById('epiPlotContainer');
+            epiPlotContainer.innerHTML = '';  // Clear the container
+
+            var img = new Image();
+            img.src = 'data:image/png;base64,' + plotData;  // Set the source of the image
+            epiPlotContainer.appendChild(img);  // Add the image to the container
         })
         .catch(error => {
-            console.error('Error fetching SIR plot:', error);
-            // Handle the error, such as by displaying an error message
+            console.error('Error fetching the epi plot:', error);
+            // Handle the error, e.g., by showing an error message
         });
 }
 
-    
-
-   }
-       
 
     </script>
 </body>

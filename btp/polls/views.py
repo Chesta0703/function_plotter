@@ -1,12 +1,12 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseNotFound
 import numpy as np
 import matplotlib
-from django.shortcuts import render
 matplotlib.use('Agg')  # Ensure using non-GUI backend for matplotlib
 import matplotlib.pyplot as plt
 import io
 import base64
 from .models import NetworkedEpi  # Assuming your model is correctly set up
+from django.shortcuts import render
 
 def networked_epi_view(request):
     if request.method == 'POST':
@@ -14,60 +14,74 @@ def networked_epi_view(request):
         beta = np.array([request.POST.getlist(f'beta_{i}') for i in range(n)], dtype=float)
         gamma = np.array(request.POST.getlist('gamma'), dtype=float)
 
+        request.session['beta'] = beta.tolist()
+        request.session['gamma'] = gamma.tolist()
+
         epi_model = NetworkedEpi(n)
         epi_model.update_params(beta=beta, gamma=gamma)
-        t0, tf = 0, 10  # Define your time range
+        t0, tf = 0, 10
         time_steps, S, I, R = epi_model.generate(t0, tf)
 
-        # Convert plots to base64 images and send them back
         plots = []
         for i in range(n):
-            plt.figure(figsize=(5, 4))
-            plt.plot(time_steps, S[:, i], label='Susceptible')
-            plt.plot(time_steps, I[:, i], label='Infected')
-            plt.plot(time_steps, R[:, i], label='Recovered')
-            plt.title(f"Node {i}")
-            plt.legend()
+            fig, ax = plt.subplots(figsize=(5, 4))
+            ax.plot(time_steps, S[:, i], label='Susceptible')
+            ax.plot(time_steps, I[:, i], label='Infected')
+            ax.plot(time_steps, R[:, i], label='Recovered')
+            ax.set_title(f"Node {i}")
+            ax.legend()
             buffer = io.BytesIO()
-            plt.savefig(buffer, format='png')
+            fig.savefig(buffer, format='png')
+            plt.close(fig)
             buffer.seek(0)
             image_png = buffer.getvalue()
             buffer.close()
-            encoded = base64.b64encode(image_png)
-            encoded = encoded.decode('utf-8')
-            plt.close()
+            encoded = base64.b64encode(image_png).decode('utf-8')
             plots.append(encoded)
 
-        # Construct the nodes and links for the network graph
         nodes = [{'id': i, 'label': f'Node {i}'} for i in range(n)]
-        links = []
-        for i in range(n):
-            for j in range(n):
-                if beta[i][j] > 0:  # Assuming a link exists if beta[i][j] is non-zero
-                    links.append({'source': i, 'target': j, 'weight': beta[i][j]})
+        links = [{'source': i, 'target': j, 'weight': beta[i][j]} for i in range(n) for j in range(n) if beta[i][j] > 0]
 
         return JsonResponse({'plots': plots, 'graph': {'nodes': nodes, 'links': links}})
 
     return render(request, 'polls/networked_epi.html', {})
 
-
-from django.http import HttpResponseNotFound
-
 def get_sir_plot(request, node_id):
+    beta = request.session.get('beta')
+    gamma = request.session.get('gamma')
+
+    if beta is None or gamma is None:
+        return HttpResponseNotFound('Session data not found')
+
     try:
-        node_id = int(node_id)  # Convert the node_id to an integer
-        # Assuming you have a way to generate or retrieve an SIR plot for the given node_id
-        plt.figure(figsize=(5, 4))
-        # Example plotting code; you'll replace this with your actual plotting logic
-        plt.plot([1, 2, 3], [1, 4, 9], label='Example Plot')
-        plt.legend()
+        node_id = int(node_id)
+        beta = np.array(beta)
+        gamma = np.array(gamma)
+        n = beta.shape[0]
+
+        if node_id >= n or node_id < 0:
+            raise ValueError('Invalid node ID')
+
+        epi_model = NetworkedEpi(n)
+        epi_model.update_params(beta=beta, gamma=gamma)
+        t0, tf = 0, 10
+        time_steps, S, I, R = epi_model.generate(t0, tf)
+
+        fig, ax = plt.subplots(figsize=(5, 4))
+        ax.plot(time_steps, S[:, node_id], label='Susceptible')
+        ax.plot(time_steps, I[:, node_id], label='Infected')
+        ax.plot(time_steps, R[:, node_id], label='Recovered')
+        ax.set_title(f"Node {node_id}")
+        ax.legend()
         buffer = io.BytesIO()
-        plt.savefig(buffer, format='png')
-        plt.close()
+        fig.savefig(buffer, format='png')
+        plt.close(fig)
         buffer.seek(0)
         image_png = buffer.getvalue()
         buffer.close()
         encoded = base64.b64encode(image_png).decode('utf-8')
+
         return JsonResponse({'plot': encoded})
-    except ValueError:
-        return HttpResponseNotFound('Node not found')
+
+    except ValueError as e:
+        return HttpResponseNotFound(str(e))
