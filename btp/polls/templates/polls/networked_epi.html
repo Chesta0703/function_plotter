@@ -10,24 +10,20 @@
 
     <!-- Include your styles and scripts here -->
     <style>
+        #betaMatrix input, #gammaVector input {
+            width: 50px; /* Decrease the width */
+        }
         body {
             display: flex;
-            flex-direction: row; /* Align items in a row */
+            flex-direction: column; /* Align items in a column */
             justify-content: center;
-            align-items: flex-start;
+            align-items: center;
             padding: 20px;
         }
 
-        #formContainer {
-            flex: 1; /* Take up 1 portion of the flex container */
-            margin-right: 20px; /* Add some space between the form and the graphs */
-        }
-
-        #graphContainer {
-            flex: 2; /* Take up 2 portions of the flex container, making it larger than the form */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        #formContainer, #graphContainer {
+            width: 90%; /* Ensure both containers take up most of the width */
+            margin-bottom: 20px; /* Space between form and graph containers */
         }
 
         #networkGraph {
@@ -36,6 +32,23 @@
             border: 1px solid #ccc;
             margin-bottom: 20px;
         }
+
+        .node:hover {
+            cursor: pointer;
+        }
+
+        #epiPlotContainer {
+            width: 100%;
+            text-align: center; /* Center the plots */
+        }
+
+        #epiPlotContainer img {
+            max-width: 90%; /* Make sure the images fit within the container */
+            height: auto;
+            margin-top: 20px;
+        }
+        
+        
 
         #epiPlots {
             width: 100%;
@@ -136,18 +149,24 @@
 
 
    document.getElementById('epiForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var formData = new FormData(this);
+            e.preventDefault();
+            var formData = new FormData(this);
 
-    fetch('', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        createNetworkGraph(data.graph); // Assuming 'data.graph' contains nodes and links for the network
-    });
-});
+            fetch('', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Check if a graph already exists, remove it if it does
+                var existingSvg = document.querySelector('#networkGraph svg');
+                if (existingSvg) {
+                    existingSvg.remove();
+                }
+
+                createNetworkGraph(data.graph); // Assuming 'data.graph' contains nodes and links for the network
+            });
+        });
 
 function createNetworkGraph(data) {
     var svg = d3.select('#networkGraph').append('svg')
@@ -155,8 +174,15 @@ function createNetworkGraph(data) {
         .attr('height', '100%')
         .attr('viewBox', [0, 0, 960, 600]);
 
+    // Create bidirectional links by duplicating each link with reversed source and target
+    var bidirectionalLinks = [];
+    data.links.forEach(function(link) {
+        bidirectionalLinks.push(link);
+        bidirectionalLinks.push({source: link.target, target: link.source, weight: link.weight}); // Reverse link
+    });
+
     var simulation = d3.forceSimulation(data.nodes)
-        .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
+        .force('link', d3.forceLink(bidirectionalLinks).id(d => d.id).distance(100))
         .force('charge', d3.forceManyBody())
         .force('center', d3.forceCenter(960 / 2, 600 / 2));
 
@@ -172,8 +198,9 @@ function createNetworkGraph(data) {
         .selectAll('circle')
         .data(data.nodes)
         .enter().append('circle')
-        .attr('r', 5)
+        .attr('r', 10)
         .attr('fill', 'blue')
+        .attr('class', 'node') // Add class for CSS styling
         .call(d3.drag()
             .on('start', dragstarted)
             .on('drag', dragged)
