@@ -192,9 +192,10 @@
 
 function createNetworkGraph(data) {
     var svg = d3.select('#networkGraph').append('svg')
-        .attr('width', '100%')
-        .attr('height', '100%')
+        .attr('width', '200%')
+        .attr('height', '200%')
         .attr('viewBox', [0, 0, 960, 600]);
+        
 
     // Create bidirectional links by duplicating each link with reversed source and target
     var bidirectionalLinks = [];
@@ -206,7 +207,7 @@ function createNetworkGraph(data) {
     var simulation = d3.forceSimulation(data.nodes)
         .force('link', d3.forceLink(bidirectionalLinks).id(d => d.id).distance(100))
         .force('charge', d3.forceManyBody())
-        .force('center', d3.forceCenter(960 / 2, 600 / 2));
+        .force('center', d3.forceCenter(960/4, 600/2));
 
     var link = svg.append('g')
         .selectAll('line')
@@ -230,6 +231,7 @@ function createNetworkGraph(data) {
             .on('drag', dragged)
             .on('end', dragended))
         .on('click', displaySIRPlot);
+        
 
     var labels = svg.append('g')
         .selectAll('text')

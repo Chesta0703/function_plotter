@@ -19,7 +19,7 @@ def networked_epi_view(request):
 
         epi_model = NetworkedEpi(n)
         epi_model.update_params(beta=beta, gamma=gamma)
-        t0, tf = 0, 10
+        t0, tf = 0, 100
         time_steps, S, I, R = epi_model.generate(t0, tf)
 
         plots = []
@@ -64,7 +64,7 @@ def get_sir_plot(request, node_id):
 
         epi_model = NetworkedEpi(n)
         epi_model.update_params(beta=beta, gamma=gamma)
-        t0, tf = 0, 10
+        t0, tf = 0, 100
         time_steps, S, I, R = epi_model.generate(t0, tf)
 
         fig, ax = plt.subplots(figsize=(5, 4))
