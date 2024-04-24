@@ -197,15 +197,14 @@ function createNetworkGraph(data) {
         .attr('viewBox', [0, 0, 960, 600]);
         
 
-    // Create bidirectional links by duplicating each link with reversed source and target
-    var bidirectionalLinks = [];
+    var Links = [];
     data.links.forEach(function(link) {
-        bidirectionalLinks.push(link);
-        bidirectionalLinks.push({source: link.target, target: link.source, weight: link.weight}); // Reverse link
+        Links.push(link);
+        Links.push({source: link.target, target: link.source, weight: link.weight}); // Reverse link
     });
 
     var simulation = d3.forceSimulation(data.nodes)
-        .force('link', d3.forceLink(bidirectionalLinks).id(d => d.id).distance(100))
+        .force('link', d3.forceLink(Links).id(d => d.id).distance(100))
         .force('charge', d3.forceManyBody())
         .force('center', d3.forceCenter(960/4, 600/2));
 
